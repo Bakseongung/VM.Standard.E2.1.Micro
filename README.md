@@ -1,4 +1,5 @@
 # OCI
+## instance_micro1
 ```yml
 Image : Canonical-Ubuntu-24.04-2026.02.28-0
 Shape : VM.Standard.E2.1.Micro

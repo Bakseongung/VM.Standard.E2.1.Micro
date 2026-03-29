@@ -4,10 +4,10 @@ error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
 // 2. DB 연결 설정
-$host = 'localhost';
-$user = 'root';
-$pw = '[비밀번호]';
-$db = 'stock_db';
+$host = '[x]';
+$user = '[x]';
+$pw = '[x]';
+$db = '[x]';
 $conn = mysqli_connect($host, $user, $pw, $db);
 
 if (!$conn) {

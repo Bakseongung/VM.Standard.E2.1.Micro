@@ -12,11 +12,11 @@ import time
 from pymysql import MySQLError
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '[비밀번호]',
-    'database': 'stock_db',
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def buy_stock(username, stock_code, amount):
@@ -86,11 +86,11 @@ import sys
 import time
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '[비밀번호]',
-    'database': 'stock_db',
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def sell_stock(username, stock_code, amount):
@@ -148,13 +148,12 @@ import pymysql
 import time
 from datetime import datetime
 
-# [설정] 본인의 MySQL 접속 정보
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '[비밀번호]',
-    'database': 'stock_db',
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def is_market_open():
@@ -233,11 +232,11 @@ if __name__ == "__main__":
 import pymysql
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '[비밀번호]',
-    'database': 'stock_db',
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def run_audit():

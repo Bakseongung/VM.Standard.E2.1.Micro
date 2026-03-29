@@ -36,7 +36,19 @@ sudo chmod -R 755 /var/www/html
 잘 돌아감 로그인 삭제하고 랭킹 기록 생성함.
 뭐 기능 추가하려고 php 나 로켓로그 .env 수정하면
 npm run build로 다시 빌드 찍고 서버 전송하고 .. 노가다..
-일단 서버 올린거 다 지우고
-다음엔 투자 시뮬레이터 만들 예정
+```
+
+```bash
+# 서버 내 파일 삭제
+cd /var/www/html
+sudo rm -rf *
+cd ..
+rm -rf php_backup
+
+# mysql
+DROP USER 'pkr_user'@'localhost';
+DROP DATABASE pokerogue;
+FLUSH PRIVILEGES;
+EXIT;
 ```
 

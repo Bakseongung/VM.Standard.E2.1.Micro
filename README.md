@@ -1,5 +1,5 @@
 # 서버
-stock_sim_v0.1 :168.107.38.18 (24H)
+stock_sim_v0.1 (24H): http://168.107.0.38/
 
 # OCI
 ## instance_micro1(stock_sim_v0.1 server)

@@ -39,6 +39,4 @@ sudo systemctl restart mysql
 ubuntu@instance-micro1:~$ sudo sysctl vm.swappiness=10
 # 영구 적용을 위해 아래 명령어도 실행
 echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
-vm.swappiness = 10
-vm.swappiness=10
 ```

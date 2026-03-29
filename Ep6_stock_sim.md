@@ -86,11 +86,11 @@ from datetime import datetime
 
 # [설정] 본인의 MySQL 접속 정보로 수정하세요
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',          
-    'password': '패스워드', # 
-    'database': 'stock_db',  
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def update_db():
@@ -264,11 +264,11 @@ nano trade.py
 import pymysql
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '[비밀번호]',
-    'database': 'stock_db',
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def buy_stock(username, stock_code, amount):
@@ -328,11 +328,11 @@ nano status.py
 import pymysql
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '[비밀번호]', #영문/숫자/특수문자 허용
-    'database': 'stock_db',
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def show_status(username):
@@ -397,11 +397,11 @@ nano sell.py
 import pymysql
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '[비밀번호]', 
-    'database': 'stock_db',
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def sell_stock(username, stock_code, amount):

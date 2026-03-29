@@ -306,11 +306,3 @@ def run_audit():
 if __name__ == "__main__":
     run_audit()
 ```
-
-```
-# 크론탭 편집창 열기
-crontab -e
-
-# 매분 실행되도록 등록 (출력은 log파일로 저장)
-* * * * * /usr/bin/python3 /home/ubuntu/stock_to_db.py >> /home/ubuntu/stock_log.log 2>&1
-```

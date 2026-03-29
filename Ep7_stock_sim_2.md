@@ -14,11 +14,11 @@ nano ranking.py
 import pymysql
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '[비밀번호]',
-    'database': 'stock_db',
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def show_rankings():
@@ -75,11 +75,11 @@ import pymysql
 import sys
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '[비밀번호]',
-    'database': 'stock_db',
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def buy_stock(username, stock_code, amount):
@@ -159,11 +159,11 @@ ubuntu@instance-micro1:~$ python3 ranking.py
 import pymysql
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '[비밀번호]',
-    'database': 'stock_db',
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def reset_simulation():
@@ -247,11 +247,11 @@ ubuntu@instance-micro1:~$ python3 ranking.py
 import pymysql
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '[비밀번호]',
-    'database': 'stock_db',
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def show_roi_rankings():
@@ -392,11 +392,11 @@ Enter password:
 import pymysql
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '[비밀번호]',
-    'database': 'stock_db',
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def show_history(username):
@@ -444,11 +444,11 @@ import pymysql
 import sys
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '[비밀번호]',
-    'database': 'stock_db',
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def sell_stock(username, stock_code, amount):

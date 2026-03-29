@@ -1,5 +1,8 @@
+# 서버
+stock_sim_v0.1 :168.107.38.18 (24H)
+
 # OCI
-## instance_micro1
+## instance_micro1(stock_sim_v0.1 server)
 ```yml
 Image : Canonical-Ubuntu-24.04-2026.02.28-0
 Shape : VM.Standard.E2.1.Micro

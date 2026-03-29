@@ -5,11 +5,11 @@ from datetime import datetime
 
 # [설정] MySQL 접속 정보
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '558Agers1@',
-    'database': 'stock_db',
-    'charset': 'utf8mb4'
+    'host': '[x]',
+    'user': '[x]',
+    'password': '[x]',
+    'database': '[x]',
+    'charset': '[x]'
 }
 
 def update_all_stocks():

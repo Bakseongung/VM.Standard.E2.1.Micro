@@ -1,12 +1,7 @@
+ubuntu@instance-micro1:/var/www/html$ cat index.php
 <?php
-error_reporting(E_ALL); 
-ini_set('display_errors', '1');
-
-$host = '[x]'; 
-$user = '[x]'; 
-$pw   = '[x]'; 
-$db   = '[x]';
-
+error_reporting(E_ALL); ini_set('display_errors', '1');
+$host = '[x]'; $user = '[x]'; $pw = '[x]'; $db = '[x]';
 $conn = mysqli_connect($host, $user, $pw, $db);
 
 $current_user = '[x]'; 
@@ -28,17 +23,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
 
         if (!$u_data || !$s_data || $amount <= 0) throw new Exception("입력 정보가 올바르지 않습니다.");
 
-        $u_id = $u_data['id']; 
-        $s_code = $s_data['code']; 
-        $total = $s_data['price'] * $amount;
+        $u_id = $u_data['id']; $s_code = $s_data['code']; $total = $s_data['price'] * $amount;
 
         if ($action == 'BUY') {
             if ($u_data['cash'] < $total) throw new Exception("잔액이 부족합니다.");
             mysqli_query($conn, "UPDATE users SET cash = cash - $total WHERE id = $u_id");
-
             $owned_res = mysqli_query($conn, "SELECT id, quantity, average_price FROM user_stocks WHERE user_id = $u_id AND stock_code = '$s_code' FOR UPDATE");
             $owned = mysqli_fetch_assoc($owned_res);
-
             if ($owned) {
                 $new_qty = $owned['quantity'] + $amount;
                 $new_avg = (($owned['quantity'] * $owned['average_price']) + $total) / $new_qty;
@@ -49,27 +40,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         } else {
             $owned_res = mysqli_query($conn, "SELECT id, quantity FROM user_stocks WHERE user_id = $u_id AND stock_code = '$s_code' FOR UPDATE");
             $owned = mysqli_fetch_assoc($owned_res);
-
             if (!$owned || $owned['quantity'] < $amount) throw new Exception("보유 수량이 부족합니다.");
-
             mysqli_query($conn, "UPDATE users SET cash = cash + $total WHERE id = $u_id");
-
-            if ($owned['quantity'] == $amount) {
-                mysqli_query($conn, "DELETE FROM user_stocks WHERE id = {$owned['id']}");
-            } else {
-                mysqli_query($conn, "UPDATE user_stocks SET quantity = quantity - $amount WHERE id = {$owned['id']}");
-            }
+            if ($owned['quantity'] == $amount) mysqli_query($conn, "DELETE FROM user_stocks WHERE id = {$owned['id']}");
+            else mysqli_query($conn, "UPDATE user_stocks SET quantity = quantity - $amount WHERE id = {$owned['id']}");
         }
-
-        mysqli_commit($conn);
-        $msg = "✅ 거래 완료!";
-    } catch (Exception $e) {
-        mysqli_rollback($conn);
-        $msg = "❌ " . $e->getMessage();
-    }
+        mysqli_commit($conn); $msg = "✅ 거래 완료!";
+    } catch (Exception $e) { mysqli_rollback($conn); $msg = "❌ " . $e->getMessage(); }
 }
 
-// 자산 조회
+// [자산 데이터 조회]
 $u_info = mysqli_fetch_assoc(mysqli_query($conn, "SELECT cash FROM users WHERE username = '$current_user'"));
 $my_cash = $u_info['cash'] ?? 0;
 
@@ -79,28 +59,24 @@ $s_list_sql = "SELECT p.code, p.name, us.quantity, p.price as curr_price, us.ave
                JOIN users u ON us.user_id = u.id 
                WHERE u.username = '$current_user'
                ORDER BY (p.price * us.quantity) DESC";
-
 $s_list_res = mysqli_query($conn, $s_list_sql);
 
 $portfolio = []; 
 $total_stock_val = 0;
-
 while($r = mysqli_fetch_assoc($s_list_res)) {
     $portfolio[] = $r; 
     $total_stock_val += ($r['curr_price'] * $r['quantity']);
 }
-
 $total_assets = $my_cash + $total_stock_val;
 $all_s = mysqli_query($conn, "SELECT code, name FROM stock_prices ORDER BY name ASC");
 ?>
 
-
-<!DOCTYPE html>  
+<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>stock_sim_v0.1</title>
+    <title>StockSim v0.2 Live</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --bg: #0b0e11; --card: #1e2329; --input: #2b3139; --text: #eaecef; --sub: #848e9c; --green: #02c076; --red: #f6465d; --blue: #2f80ed; --border: #363c4e; --yellow: #f1c40f; }
@@ -124,7 +100,7 @@ $all_s = mysqli_query($conn, "SELECT code, name FROM stock_prices ORDER BY name 
         td { padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .stock-name { color: var(--blue); cursor: pointer; font-weight: bold; text-decoration: underline; }
         .live-ticker { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; }
-        .ticker-price { font-size: 32px; font-weight: bold; color: var(--green); }
+        .ticker-price { font-size: 32px; font-weight: bold; color: var(--green); transition: color 0.3s ease; }
         .chart-ctrl { display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center; border-top: 1px solid var(--border); padding-top: 15px; }
         .range-btns button { background: var(--input); color: var(--sub); border: none; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; margin-left: 4px; }
         .range-btns button.active { background: var(--blue); color: white; }
@@ -142,11 +118,11 @@ $all_s = mysqli_query($conn, "SELECT code, name FROM stock_prices ORDER BY name 
 <?php endif; ?>
 
 <div class="summary-label">총 평가 자산</div>
-<span class="summary-val">₩<?php echo number_format($total_assets); ?></span>
+<span class="summary-val" id="top_total_assets">₩<?php echo number_format($total_assets); ?></span>
 
 <div class="card" style="z-index: 2001;">
     <form method="POST" class="trade-box" id="tradeForm">
-        <input type="hidden" name="username" value="Seongung">
+        <input type="hidden" name="username" value="[x]">
         <div class="search-container">
             <input type="text" id="stock_input" name="stock_input" placeholder="종목명 또는 코드 입력" autocomplete="off" required>
             <div id="search_results"></div>
@@ -163,12 +139,11 @@ $all_s = mysqli_query($conn, "SELECT code, name FROM stock_prices ORDER BY name 
             <h3 style="margin-top:0; font-size: 16px;">내 자산 현황</h3>
             <table>
                 <thead><tr><th>종목</th><th>보유량</th><th>수익률</th></tr></thead>
-                <tbody>
+                <tbody id="portfolio_body">
                     <?php foreach($portfolio as $p): 
-                        // 🔥 버그 수정 핵심: 평단가가 0일 경우 에러 방지 처리
                         $rate = ($p['average_price'] > 0) ? (($p['curr_price'] - $p['average_price']) / $p['average_price']) * 100 : 0; ?>
                         <tr>
-                            <td class="stock-name" onclick="updateChart('<?php echo $p['code']; ?>', '<?php echo $p['name']; ?>')"><?php echo $p['name']; ?></td>
+                            <td class="stock-name" onclick="changeStock('<?php echo $p['code']; ?>', '<?php echo $p['name']; ?>')"><?php echo $p['name']; ?></td>
                             <td><?php echo number_format($p['quantity']); ?>주</td>
                             <td style="color:<?php echo $rate >= 0 ? 'var(--green)' : 'var(--red)'; ?>"><?php echo round($rate, 2); ?>%</td>
                         </tr>
@@ -194,10 +169,10 @@ $all_s = mysqli_query($conn, "SELECT code, name FROM stock_prices ORDER BY name 
             <div class="chart-ctrl">
                 <div id="c_title" style="font-size: 14px; font-weight: bold; color: var(--sub);">실시간 차트</div>
                 <div class="range-btns">
-                    <button onclick="updateChart(c_code, c_name, '1d')">1일</button>
-                    <button onclick="updateChart(c_code, c_name, '1w')">1주</button>
-                    <button onclick="updateChart(c_code, c_name, '1m')">1달</button>
-                    <button onclick="updateChart(c_code, c_name, 'all')" class="active">전체</button>
+                    <button onclick="updateRange('1d')">1일</button>
+                    <button onclick="updateRange('1w')">1주</button>
+                    <button onclick="updateRange('1m')">1달</button>
+                    <button onclick="updateRange('all')" class="active">전체</button>
                 </div>
             </div>
             <div class="chart-wrap">
@@ -209,13 +184,28 @@ $all_s = mysqli_query($conn, "SELECT code, name FROM stock_prices ORDER BY name 
 
 <nav class="nav-bar">
     <div class="nav-item"><span class="nav-l">예수금</span><span class="nav-v" style="color:var(--yellow)">₩<?php echo number_format($my_cash); ?></span></div>
-    <div class="nav-item"><span class="nav-l">주식평가액</span><span class="nav-v">₩<?php echo number_format($total_stock_val); ?></span></div>
-    <div class="nav-item"><span class="nav-l">총 자산</span><span class="nav-v">₩<?php echo number_format($total_assets); ?></span></div>
+    <div class="nav-item"><span class="nav-l">주식평가액</span><span class="nav-v" id="nav_stock_val">₩<?php echo number_format($total_stock_val); ?></span></div>
+    <div class="nav-item"><span class="nav-l">총 자산</span><span class="nav-v" id="nav_total_assets">₩<?php echo number_format($total_assets); ?></span></div>
 </nav>
 
 <script>
 let chart = null;
-let c_code = null, c_name = null;
+let c_code = null;
+let c_name = null;
+let c_range = 'all';
+let last_db_time = null; 
+
+// [0] 실시간 시계 (초 단위)
+function updateLiveClock() {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    // ticker_time 옆이나 적당한 곳에 배치하기 위해 innerHTML 사용
+    const clockStr = `<span style="color:var(--blue); margin-right:10px;">현재시간: ${hours}:${minutes}:${seconds}</span>`;
+    document.getElementById('live_clock').innerHTML = clockStr;
+}
+setInterval(updateLiveClock, 1000);
 
 const allStocks = [
     <?php mysqli_data_seek($all_s, 0); while($s = mysqli_fetch_assoc($all_s)) { echo "{name:'".addslashes($s['name'])."', code:'".$s['code']."'},"; } ?>
@@ -234,64 +224,136 @@ stockInput.addEventListener('input', function() {
             const div = document.createElement('div');
             div.className = 'search-item';
             div.innerHTML = `<span class="s-name">${s.name}</span><span class="s-code">${s.code}</span>`;
-            div.onclick = () => { stockInput.value = s.name; resultsDiv.style.display = 'none'; updateChart(s.code, s.name); };
+            div.onclick = () => { 
+                stockInput.value = s.name; 
+                resultsDiv.style.display = 'none'; 
+                changeStock(s.code, s.name); 
+            };
             resultsDiv.appendChild(div);
         });
         resultsDiv.style.display = 'block';
     } else { resultsDiv.style.display = 'none'; }
 });
 
-document.addEventListener('click', (e) => { if (e.target !== stockInput) resultsDiv.style.display = 'none'; });
+function changeStock(code, name) {
+    if (c_code === code) return;
+    c_code = code;
+    c_name = name;
+    last_db_time = null; 
+    updateDashboard();
+}
 
-function updateChart(code, name, range='all') {
-    if(!code) return;
-    c_code = code; c_name = name;
-    
+function updateRange(range) {
+    c_range = range;
     document.querySelectorAll('.range-btns button').forEach(b => {
         b.classList.remove('active');
         const text = b.innerText;
-        if((range === '1d' && text === '1일') || (range === '1w' && text === '1주') || (range === '1m' && text === '1달') || (range === 'all' && text === '전체')) b.classList.add('active');
+        const mapping = {'1d':'1일', '1w':'1주', '1m':'1달', 'all':'전체'};
+        if(mapping[range] === text) b.classList.add('active');
     });
+    last_db_time = null;
+    updateDashboard();
+}
 
-    fetch(`get_stock_detail.php?code=${code}`)
+function updateDashboard() {
+    if(!c_code) return;
+
+    fetch(`get_stock_detail.php?code=${c_code}`)
         .then(r => r.json())
         .then(data => {
-            document.getElementById('ticker_name').innerText = name + " (" + code + ")";
-            document.getElementById('ticker_price').innerText = Number(data.price).toLocaleString();
-            document.getElementById('ticker_market').innerText = data.market;
-            document.getElementById('ticker_time').innerText = "최근 업데이트: " + (data.updated_at ? data.updated_at.split(' ')[1] : '-');
-        });
+            const new_db_time = data.updated_at;
 
-    fetch(`get_history.php?code=${code}&range=${range}`)
+            // 업데이트 감지 로직
+            if (new_db_time !== last_db_time) {
+                last_db_time = new_db_time;
+
+                const priceEl = document.getElementById('ticker_price');
+                const oldPrice = parseInt(priceEl.innerText.replace(/,/g, '')) || 0;
+                const newPrice = parseInt(data.price);
+
+                // 가격 변동 애니메이션 효과
+                priceEl.style.transition = 'none';
+                if (newPrice > oldPrice && oldPrice !== 0) priceEl.style.color = '#fff'; // 반짝 효과
+                else if (newPrice < oldPrice && oldPrice !== 0) priceEl.style.color = '#fff';
+
+                setTimeout(() => {
+                    priceEl.style.transition = 'color 0.5s';
+                    priceEl.style.color = (newPrice > oldPrice) ? 'var(--green)' : 'var(--red)';
+                    if(newPrice === oldPrice) priceEl.style.color = 'var(--text)';
+                }, 100);
+
+                document.getElementById('ticker_name').innerText = c_name + " (" + c_code + ")";
+                priceEl.innerText = newPrice.toLocaleString();
+                document.getElementById('ticker_market').innerText = data.market;
+                
+                // 업데이트 시간 표시부
+                document.getElementById('ticker_time').innerText = "DB 갱신: " + (new_db_time ? new_db_time.split(' ')[1] : '-');
+
+                refreshChart();
+            }
+        });
+}
+
+function refreshChart() {
+    fetch(`get_history.php?code=${c_code}&range=${c_range}`)
         .then(r => r.json())
         .then(data => {
             const ctx = document.getElementById('mainChart').getContext('2d');
-            if(chart) chart.destroy();
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.labels,
-                    datasets: [{
-                        data: data.prices, borderColor: '#02c076', borderWidth: 2, pointRadius: 0, tension: 0.1, fill: true,
-                        backgroundColor: c => {
-                            const g = c.chart.ctx.createLinearGradient(0, 0, 0, 400);
-                            g.addColorStop(0, 'rgba(2, 192, 118, 0.3)'); g.addColorStop(1, 'rgba(2, 192, 118, 0)');
-                            return g;
-                        }
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-                    scales: { x: { grid: { color: '#2b3139' }, ticks: { color: '#848e9c', maxTicksLimit: 6 } }, y: { position: 'right', grid: { color: '#2b3139' }, ticks: { color: '#02c076' } } }
-                }
-            });
+            if(chart) {
+                chart.data.labels = data.labels;
+                chart.data.datasets[0].data = data.prices;
+                chart.update('none'); 
+            } else {
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            data: data.prices, borderColor: '#02c076', borderWidth: 2, pointRadius: 0, tension: 0.1, fill: true,
+                            backgroundColor: c => {
+                                const g = c.chart.ctx.createLinearGradient(0, 0, 0, 400);
+                                g.addColorStop(0, 'rgba(2, 192, 118, 0.3)'); g.addColorStop(1, 'rgba(2, 192, 118, 0)');
+                                return g;
+                            }
+                        }]
+                    },
+                    options: { 
+                        responsive: true, maintainAspectRatio: false, animation: false,
+                        plugins: { legend: { display: false } },
+                        scales: { 
+                            x: { grid: { color: '#2b3139' }, ticks: { color: '#848e9c', maxTicksLimit: 6 } }, 
+                            y: { position: 'right', grid: { color: '#2b3139' }, ticks: { color: '#02c076' } } 
+                        } 
+                    }
+                });
+            }
         });
 }
 
 window.onload = () => {
-    const firstStock = document.querySelector('.stock-name');
-    if (firstStock) firstStock.click();
-    else updateChart('005930', '삼성전자');
+    // [추가] 실시간 시계 들어갈 자리 확보 (없으면 생성)
+    if(!document.getElementById('live_clock')) {
+        const timeBox = document.getElementById('ticker_time').parentNode;
+        const clockDiv = document.createElement('div');
+        clockDiv.id = 'live_clock';
+        clockDiv.style.fontSize = '12px';
+        clockDiv.style.marginBottom = '2px';
+        timeBox.insertBefore(clockDiv, document.getElementById('ticker_time'));
+    }
+
+    const firstStockRow = document.querySelector('.stock-name');
+    if (firstStockRow) {
+        const initCode = "<?php echo isset($portfolio[0]) ? $portfolio[0]['code'] : '005930'; ?>";
+        const initName = "<?php echo isset($portfolio[0]) ? $portfolio[0]['name'] : '삼성전자'; ?>";
+        changeStock(initCode, initName);
+    } else {
+        changeStock('005930', '삼성전자');
+    }
+
+    // 체크 주기를 1초로 단축 (수집기 종료 시점을 더 빨리 낚아채기 위함)
+    setInterval(updateDashboard, 1000);
 };
 </script>
+
 </body>
 </html>

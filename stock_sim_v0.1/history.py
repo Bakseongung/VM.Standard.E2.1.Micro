@@ -5,14 +5,13 @@ DB_CONFIG = {
     'user': '[x]',
     'password': '[x]',
     'database': '[x]',
-    'charset': '[x]'
+    'charset': 'utf8mb4'
 }
 
 def show_history(username):
     conn = pymysql.connect(**DB_CONFIG)
     try:
         with conn.cursor() as cursor:
-            # 유저의 최근 거래 10개를 시간순(최신순)으로 가져옴
             sql = """
             SELECT h.trade_at, p.name, h.trade_type, h.amount, h.price, h.total_price
             FROM trade_history h
@@ -44,4 +43,4 @@ def show_history(username):
         conn.close()
 
 if __name__ == "__main__":
-    show_history('Seongung')
+    show_history('[x]')

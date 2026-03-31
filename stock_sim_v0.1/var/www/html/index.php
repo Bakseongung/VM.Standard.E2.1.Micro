@@ -1,22 +1,18 @@
 <?php
-// 1. 에러 보고 (디버깅용)
-error_reporting(E_ALL);
+error_reporting(E_ALL); 
 ini_set('display_errors', '1');
 
-// 2. DB 연결 설정
-$host = '[x]';
-$user = '[x]';
-$pw = '[x]';
-$db = '[x]';
+$host = '[x]'; 
+$user = '[x]'; 
+$pw   = '[x]'; 
+$db   = '[x]';
+
 $conn = mysqli_connect($host, $user, $pw, $db);
 
-if (!$conn) {
-    die("DB 연결 실패: " . mysqli_connect_error());
-}
-
+$current_user = '[x]'; 
 $msg = "";
 
-// 3. [매매 처리 로직]
+// [매매 로직]
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
     $username = mysqli_real_escape_string($conn, $_POST['username']);
     $stock_input = mysqli_real_escape_string($conn, $_POST['stock_input']);
@@ -24,48 +20,40 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
 
     mysqli_begin_transaction($conn);
-
     try {
-        // 유저 정보 잠금 조회
-        $u_sql = "SELECT id, cash FROM users WHERE username = '$username' FOR UPDATE";
-        $u_res = mysqli_query($conn, $u_sql);
-        $user_data = mysqli_fetch_assoc($u_res);
+        $u_res = mysqli_query($conn, "SELECT id, cash FROM users WHERE username = '$username' FOR UPDATE");
+        $s_res = mysqli_query($conn, "SELECT code, price FROM stock_prices WHERE code = '$stock_input' OR name = '$stock_input' FOR UPDATE");
+        $u_data = mysqli_fetch_assoc($u_res);
+        $s_data = mysqli_fetch_assoc($s_res);
 
-        // 종목 정보 잠금 조회
-        $s_sql = "SELECT code, price, name FROM stock_prices WHERE code = '$stock_input' OR name = '$stock_input' FOR UPDATE";
-        $s_res = mysqli_query($conn, $s_sql);
-        $stock_data = mysqli_fetch_assoc($s_res);
+        if (!$u_data || !$s_data || $amount <= 0) throw new Exception("입력 정보가 올바르지 않습니다.");
 
-        if (!$user_data || !$stock_data || $amount <= 0) {
-            throw new Exception("정보가 올바르지 않거나 수량이 잘못되었습니다.");
-        }
-
-        $user_id = $user_data['id'];
-        $cash = $user_data['cash'];
-        $stock_code = $stock_data['code'];
-        $price = $stock_data['price'];
-        $total_price = $price * $amount;
+        $u_id = $u_data['id']; 
+        $s_code = $s_data['code']; 
+        $total = $s_data['price'] * $amount;
 
         if ($action == 'BUY') {
-            if ($cash < $total_price) throw new Exception("잔액이 부족합니다.");
-            mysqli_query($conn, "UPDATE users SET cash = cash - $total_price WHERE id = $user_id");
-            
-            $check_stock = mysqli_query($conn, "SELECT id, quantity, average_price FROM user_stocks WHERE user_id = $user_id AND stock_code = '$stock_code' FOR UPDATE");
-            $owned = mysqli_fetch_assoc($check_stock);
+            if ($u_data['cash'] < $total) throw new Exception("잔액이 부족합니다.");
+            mysqli_query($conn, "UPDATE users SET cash = cash - $total WHERE id = $u_id");
+
+            $owned_res = mysqli_query($conn, "SELECT id, quantity, average_price FROM user_stocks WHERE user_id = $u_id AND stock_code = '$s_code' FOR UPDATE");
+            $owned = mysqli_fetch_assoc($owned_res);
 
             if ($owned) {
                 $new_qty = $owned['quantity'] + $amount;
-                $new_avg = (($owned['quantity'] * $owned['average_price']) + $total_price) / $new_qty;
+                $new_avg = (($owned['quantity'] * $owned['average_price']) + $total) / $new_qty;
                 mysqli_query($conn, "UPDATE user_stocks SET quantity = $new_qty, average_price = $new_avg WHERE id = {$owned['id']}");
             } else {
-                mysqli_query($conn, "INSERT INTO user_stocks (user_id, stock_code, quantity, average_price) VALUES ($user_id, '$stock_code', $amount, $price)");
+                mysqli_query($conn, "INSERT INTO user_stocks (user_id, stock_code, quantity, average_price) VALUES ($u_id, '$s_code', $amount, {$s_data['price']})");
             }
         } else {
-            $check_stock = mysqli_query($conn, "SELECT id, quantity FROM user_stocks WHERE user_id = $user_id AND stock_code = '$stock_code' FOR UPDATE");
-            $owned = mysqli_fetch_assoc($check_stock);
+            $owned_res = mysqli_query($conn, "SELECT id, quantity FROM user_stocks WHERE user_id = $u_id AND stock_code = '$s_code' FOR UPDATE");
+            $owned = mysqli_fetch_assoc($owned_res);
+
             if (!$owned || $owned['quantity'] < $amount) throw new Exception("보유 수량이 부족합니다.");
 
-            mysqli_query($conn, "UPDATE users SET cash = cash + $total_price WHERE id = $user_id");
+            mysqli_query($conn, "UPDATE users SET cash = cash + $total WHERE id = $u_id");
+
             if ($owned['quantity'] == $amount) {
                 mysqli_query($conn, "DELETE FROM user_stocks WHERE id = {$owned['id']}");
             } else {
@@ -73,149 +61,237 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
             }
         }
 
-        mysqli_query($conn, "INSERT INTO trade_history (user_id, stock_code, trade_type, amount, price, total_price) VALUES ($user_id, '$stock_code', '$action', $amount, $price, $total_price)");
         mysqli_commit($conn);
-        $msg = "✅ 거래 성공!";
+        $msg = "✅ 거래 완료!";
     } catch (Exception $e) {
         mysqli_rollback($conn);
-        $msg = "❌ 에러: " . $e->getMessage();
+        $msg = "❌ " . $e->getMessage();
     }
 }
 
-// 4. [데이터 조회]
-// 랭킹 조회
-$rank_sql = "SELECT u.username, u.cash + IFNULL(SUM(us.quantity * p.price), 0) AS total_assets FROM users u LEFT JOIN user_stocks us ON u.id = us.user_id LEFT JOIN stock_prices p ON us.stock_code = p.code GROUP BY u.id ORDER BY total_assets DESC LIMIT 10";
-$rank_res = mysqli_query($conn, $rank_sql);
+// 자산 조회
+$u_info = mysqli_fetch_assoc(mysqli_query($conn, "SELECT cash FROM users WHERE username = '$current_user'"));
+$my_cash = $u_info['cash'] ?? 0;
 
-// 내 포트폴리오 조회 (Seongung 기준)
-$my_stock_sql = "SELECT p.name, us.quantity, us.average_price, p.price as current_price FROM user_stocks us JOIN stock_prices p ON us.stock_code = p.code JOIN users u ON us.user_id = u.id WHERE u.username = 'Seongung' ORDER BY (p.price * us.quantity) DESC";
-$my_stock_res = mysqli_query($conn, $my_stock_sql);
+$s_list_sql = "SELECT p.code, p.name, us.quantity, p.price as curr_price, us.average_price 
+               FROM user_stocks us 
+               JOIN stock_prices p ON us.stock_code = p.code 
+               JOIN users u ON us.user_id = u.id 
+               WHERE u.username = '$current_user'
+               ORDER BY (p.price * us.quantity) DESC";
 
-$labels = [];
-$data_values = [];
+$s_list_res = mysqli_query($conn, $s_list_sql);
+
+$portfolio = []; 
+$total_stock_val = 0;
+
+while($r = mysqli_fetch_assoc($s_list_res)) {
+    $portfolio[] = $r; 
+    $total_stock_val += ($r['curr_price'] * $r['quantity']);
+}
+
+$total_assets = $my_cash + $total_stock_val;
+$all_s = mysqli_query($conn, "SELECT code, name FROM stock_prices ORDER BY name ASC");
 ?>
 
-<!DOCTYPE html>
+
+<!DOCTYPE html>  
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>K-Stock Simulator Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>stock_sim_v0.1</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; background: #f4f7f6; padding: 20px; color: #333; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-bottom: 25px; }
-        .flex-container { display: flex; gap: 30px; flex-wrap: wrap; align-items: flex-start; }
-        .chart-container { flex: 1; min-width: 300px; height: 350px; }
-        .table-container { flex: 1.5; min-width: 500px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 15px; border-bottom: 1px solid #eee; text-align: left; }
-        th { background: #fafafa; color: #666; }
-        .btn { padding: 12px 25px; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; transition: 0.3s; }
-        .btn-buy { background: #e74c3c; } .btn-buy:hover { background: #c0392b; }
-        .btn-sell { background: #3498db; } .btn-sell:hover { background: #2980b9; }
-        input { padding: 12px; margin-right: 10px; border: 1px solid #ddd; border-radius: 6px; width: 180px; }
-        .plus { color: #e74c3c; font-weight: bold; }
-        .minus { color: #3498db; font-weight: bold; }
+        :root { --bg: #0b0e11; --card: #1e2329; --input: #2b3139; --text: #eaecef; --sub: #848e9c; --green: #02c076; --red: #f6465d; --blue: #2f80ed; --border: #363c4e; --yellow: #f1c40f; }
+        body { font-family: 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px 15px 120px; overflow-x: hidden; }
+        .summary-label { font-size: 13px; color: var(--sub); margin-top: 10px; }
+        .summary-val { font-size: 34px; font-weight: bold; margin: 10px 0 20px 0; display: block; }
+        .card { background: var(--card); border-radius: 12px; padding: 18px; margin-bottom: 15px; border: 1px solid var(--border); position: relative; }
+        .main-container { display: flex; gap: 15px; align-items: flex-start; }
+        .side-panel { flex: 4; min-width: 320px; }
+        .main-panel { flex: 6; }
+        @media (max-width: 1024px) { .main-container { flex-direction: column; } .side-panel, .main-panel { width: 100%; flex: none; } }
+        .trade-box { display: flex; gap: 8px; position: relative; }
+        .search-container { position: relative; flex: 2; }
+        input { background: var(--input); border: 1px solid var(--border); color: white; padding: 12px; border-radius: 6px; width: 100%; box-sizing: border-box; outline: none; }
+        .btn { padding: 12px 20px; border-radius: 6px; font-weight: bold; border: none; color: white; cursor: pointer; min-width: 70px; }
+        #search_results { position: absolute; top: 100%; left: 0; right: 0; background: var(--input); border: 1px solid var(--border); border-radius: 8px; max-height: 280px; overflow-y: auto; z-index: 2000; display: none; margin-top: 5px; }
+        .search-item { padding: 12px 15px; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .search-item:hover { background: var(--border); }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { text-align: left; color: var(--sub); padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+        td { padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .stock-name { color: var(--blue); cursor: pointer; font-weight: bold; text-decoration: underline; }
+        .live-ticker { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; }
+        .ticker-price { font-size: 32px; font-weight: bold; color: var(--green); }
+        .chart-ctrl { display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center; border-top: 1px solid var(--border); padding-top: 15px; }
+        .range-btns button { background: var(--input); color: var(--sub); border: none; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; margin-left: 4px; }
+        .range-btns button.active { background: var(--blue); color: white; }
+        .chart-wrap { height: 400px; position: relative; }
+        .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #161a1e; display: flex; padding: 15px; border-top: 1px solid var(--border); z-index: 1000; }
+        .nav-item { flex: 1; text-align: center; border-right: 1px solid var(--border); }
+        .nav-l { font-size: 11px; color: var(--sub); display: block; }
+        .nav-v { font-size: 15px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <h1>📊 주식 시뮬레이터 실시간 대시보드</h1>
+<?php if($msg): ?>
+    <div style="background:var(--card); padding:10px; border-radius:8px; margin-bottom:15px; text-align:center; border:1px solid var(--green)"><?php echo $msg; ?></div>
+<?php endif; ?>
 
-    <?php if($msg) echo "<script>alert('$msg');</script>"; ?>
+<div class="summary-label">총 평가 자산</div>
+<span class="summary-val">₩<?php echo number_format($total_assets); ?></span>
 
-    <div class="card">
-        <h2>💰 빠른 매매</h2>
-        <form method="POST">
-            <input type="text" name="username" value="Seongung" readonly style="background:#eee;">
-            <input type="text" name="stock_input" placeholder="종목명 또는 코드" required>
-            <input type="number" name="amount" placeholder="수량" min="1" required>
-            <button type="submit" name="action" value="BUY" class="btn btn-buy">즉시 매수</button>
-            <button type="submit" name="action" value="SELL" class="btn btn-sell">즉시 매도</button>
-        </form>
-    </div>
+<div class="card" style="z-index: 2001;">
+    <form method="POST" class="trade-box" id="tradeForm">
+        <input type="hidden" name="username" value="Seongung">
+        <div class="search-container">
+            <input type="text" id="stock_input" name="stock_input" placeholder="종목명 또는 코드 입력" autocomplete="off" required>
+            <div id="search_results"></div>
+        </div>
+        <input type="number" name="amount" placeholder="수량" required style="flex:1;">
+        <button type="submit" name="action" value="BUY" class="btn" style="background:var(--red)">매수</button>
+        <button type="submit" name="action" value="SELL" class="btn" style="background:var(--blue)">매도</button>
+    </form>
+</div>
 
-    <div class="card" style="border-top: 6px solid #3498db;">
-        <h2>💼 [Seongung]님의 실시간 자산 분석</h2>
-        <div class="flex-container">
-            <div class="chart-container">
-                <canvas id="portfolioChart"></canvas>
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr><th>종목명</th><th>보유량</th><th>현재가</th><th>수익률</th></tr>
-                    </thead>
-                    <tbody>
-                        <?php 
-                        if (mysqli_num_rows($my_stock_res) > 0) {
-                            while($row = mysqli_fetch_assoc($my_stock_res)) {
-                                $labels[] = $row['name'];
-                                $eval_amt = $row['current_price'] * $row['quantity'];
-                                $data_values[] = $eval_amt;
-                                $profit_rate = (($row['current_price'] - $row['average_price']) / $row['average_price']) * 100;
-                                $p_class = $profit_rate >= 0 ? 'plus' : 'minus';
-                                echo "<tr>
-                                        <td><strong>{$row['name']}</strong></td>
-                                        <td>".number_format($row['quantity'])."주</td>
-                                        <td>".number_format($row['current_price'])."원</td>
-                                        <td class='{$p_class}'>".round($profit_rate, 2)."%</td>
-                                      </tr>";
-                            }
-                        } else {
-                            echo "<tr><td colspan='4' style='text-align:center; padding:50px;'>보유한 주식이 없습니다. 상단에서 매수해보세요!</td></tr>";
-                        }
-                        ?>
-                    </tbody>
-                </table>
-            </div>
+<div class="main-container">
+    <div class="side-panel">
+        <div class="card" style="min-height: 520px;">
+            <h3 style="margin-top:0; font-size: 16px;">내 자산 현황</h3>
+            <table>
+                <thead><tr><th>종목</th><th>보유량</th><th>수익률</th></tr></thead>
+                <tbody>
+                    <?php foreach($portfolio as $p): 
+                        // 🔥 버그 수정 핵심: 평단가가 0일 경우 에러 방지 처리
+                        $rate = ($p['average_price'] > 0) ? (($p['curr_price'] - $p['average_price']) / $p['average_price']) * 100 : 0; ?>
+                        <tr>
+                            <td class="stock-name" onclick="updateChart('<?php echo $p['code']; ?>', '<?php echo $p['name']; ?>')"><?php echo $p['name']; ?></td>
+                            <td><?php echo number_format($p['quantity']); ?>주</td>
+                            <td style="color:<?php echo $rate >= 0 ? 'var(--green)' : 'var(--red)'; ?>"><?php echo round($rate, 2); ?>%</td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 
-    <div class="card">
-        <h2>🏆 전체 수익률 랭킹</h2>
-        <table>
-            <thead>
-                <tr><th>순위</th><th>사용자</th><th>총 자산(현금+주식)</th></tr>
-            </thead>
-            <tbody>
-                <?php 
-                $rank = 1;
-                while($row = mysqli_fetch_assoc($rank_res)) {
-                    $is_me = ($row['username'] == 'Seongung') ? "style='background:#fff9f9; font-weight:bold;'" : "";
-                    echo "<tr $is_me>
-                            <td>{$rank}위</td>
-                            <td>{$row['username']}</td>
-                            <td>".number_format($row['total_assets'])."원</td>
-                          </tr>";
-                    $rank++;
-                } ?>
-            </tbody>
-        </table>
-    </div>
+    <div class="main-panel">
+        <div class="card" style="min-height: 520px;">
+            <div class="live-ticker">
+                <div>
+                    <div id="ticker_name" style="font-size: 18px; font-weight: bold; color: var(--blue);">종목 선택</div>
+                    <div id="ticker_market" style="font-size: 11px; color: var(--sub); background: var(--input); padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 5px;">-</div>
+                </div>
+                <div style="text-align: right;">
+                    <div id="ticker_price" class="ticker-price">0</div>
+                    <div id="ticker_time" style="font-size: 12px; color: var(--sub);">최근 업데이트: -</div>
+                </div>
+            </div>
 
-    <script>
-        const ctx = document.getElementById('portfolioChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: <?php echo json_encode($labels); ?>,
-                datasets: [{
-                    data: <?php echo json_encode($data_values); ?>,
-                    backgroundColor: ['#ff6384', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff', '#fdb45c'],
-                    hoverOffset: 15,
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom', labels: { padding: 20 } },
-                    tooltip: { callbacks: { label: (item) => ' ' + item.label + ': ' + item.raw.toLocaleString() + '원' } }
-                }
-            }
+            <div class="chart-ctrl">
+                <div id="c_title" style="font-size: 14px; font-weight: bold; color: var(--sub);">실시간 차트</div>
+                <div class="range-btns">
+                    <button onclick="updateChart(c_code, c_name, '1d')">1일</button>
+                    <button onclick="updateChart(c_code, c_name, '1w')">1주</button>
+                    <button onclick="updateChart(c_code, c_name, '1m')">1달</button>
+                    <button onclick="updateChart(c_code, c_name, 'all')" class="active">전체</button>
+                </div>
+            </div>
+            <div class="chart-wrap">
+                <canvas id="mainChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<nav class="nav-bar">
+    <div class="nav-item"><span class="nav-l">예수금</span><span class="nav-v" style="color:var(--yellow)">₩<?php echo number_format($my_cash); ?></span></div>
+    <div class="nav-item"><span class="nav-l">주식평가액</span><span class="nav-v">₩<?php echo number_format($total_stock_val); ?></span></div>
+    <div class="nav-item"><span class="nav-l">총 자산</span><span class="nav-v">₩<?php echo number_format($total_assets); ?></span></div>
+</nav>
+
+<script>
+let chart = null;
+let c_code = null, c_name = null;
+
+const allStocks = [
+    <?php mysqli_data_seek($all_s, 0); while($s = mysqli_fetch_assoc($all_s)) { echo "{name:'".addslashes($s['name'])."', code:'".$s['code']."'},"; } ?>
+];
+
+const stockInput = document.getElementById('stock_input');
+const resultsDiv = document.getElementById('search_results');
+
+stockInput.addEventListener('input', function() {
+    const val = this.value.toUpperCase();
+    resultsDiv.innerHTML = '';
+    if(!val) { resultsDiv.style.display = 'none'; return; }
+    const filtered = allStocks.filter(s => s.name.toUpperCase().includes(val) || s.code.includes(val)).slice(0, 10);
+    if(filtered.length > 0) {
+        filtered.forEach(s => {
+            const div = document.createElement('div');
+            div.className = 'search-item';
+            div.innerHTML = `<span class="s-name">${s.name}</span><span class="s-code">${s.code}</span>`;
+            div.onclick = () => { stockInput.value = s.name; resultsDiv.style.display = 'none'; updateChart(s.code, s.name); };
+            resultsDiv.appendChild(div);
         });
-    </script>
+        resultsDiv.style.display = 'block';
+    } else { resultsDiv.style.display = 'none'; }
+});
+
+document.addEventListener('click', (e) => { if (e.target !== stockInput) resultsDiv.style.display = 'none'; });
+
+function updateChart(code, name, range='all') {
+    if(!code) return;
+    c_code = code; c_name = name;
+    
+    document.querySelectorAll('.range-btns button').forEach(b => {
+        b.classList.remove('active');
+        const text = b.innerText;
+        if((range === '1d' && text === '1일') || (range === '1w' && text === '1주') || (range === '1m' && text === '1달') || (range === 'all' && text === '전체')) b.classList.add('active');
+    });
+
+    fetch(`get_stock_detail.php?code=${code}`)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('ticker_name').innerText = name + " (" + code + ")";
+            document.getElementById('ticker_price').innerText = Number(data.price).toLocaleString();
+            document.getElementById('ticker_market').innerText = data.market;
+            document.getElementById('ticker_time').innerText = "최근 업데이트: " + (data.updated_at ? data.updated_at.split(' ')[1] : '-');
+        });
+
+    fetch(`get_history.php?code=${code}&range=${range}`)
+        .then(r => r.json())
+        .then(data => {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            if(chart) chart.destroy();
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.prices, borderColor: '#02c076', borderWidth: 2, pointRadius: 0, tension: 0.1, fill: true,
+                        backgroundColor: c => {
+                            const g = c.chart.ctx.createLinearGradient(0, 0, 0, 400);
+                            g.addColorStop(0, 'rgba(2, 192, 118, 0.3)'); g.addColorStop(1, 'rgba(2, 192, 118, 0)');
+                            return g;
+                        }
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: { x: { grid: { color: '#2b3139' }, ticks: { color: '#848e9c', maxTicksLimit: 6 } }, y: { position: 'right', grid: { color: '#2b3139' }, ticks: { color: '#02c076' } } }
+                }
+            });
+        });
+}
+
+window.onload = () => {
+    const firstStock = document.querySelector('.stock-name');
+    if (firstStock) firstStock.click();
+    else updateChart('005930', '삼성전자');
+};
+</script>
 </body>
 </html>

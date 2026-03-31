@@ -12,7 +12,7 @@ def clean_old_data():
     conn = pymysql.connect(**DB_CONFIG)
     try:
         with conn.cursor() as cursor:
-            # 7일 지난 데이터 삭제 쿼리
+            # 7일 지난 데이터 삭제
             sql = "DELETE FROM stock_history WHERE recorded_at < NOW() - INTERVAL 7 DAY;"
             cursor.execute(sql)
             conn.commit()

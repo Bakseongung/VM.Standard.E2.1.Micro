@@ -1,40 +1,73 @@
-ubuntu@instance-micro1:~$ cat collector.py
-import requests
-from bs4 import BeautifulSoup
-import pymysql
+import asyncio
+import aiohttp
 import time
+import redis.asyncio as redis
+from datetime import datetime
 
-# DB 연결 설정
-db = pymysql.connect(host='[x]', user='[x]', password='[x]', db='[x]')
-cursor = db.cursor()
+# Redis 설정 (민감정보 가림)
+REDIS_HOST = '[x]'
+REDIS_PORT = '[x]'
 
-def get_realtime_price(code):
-    url = f"https://finance.naver.com/item/main.naver?code={code}"
-    res = requests.get(url)
-    soup = BeautifulSoup(res.text, 'html.parser')
-    # 네이버 금융에서 현재가 추출
-    price_tag = soup.select_one(".today .no_today .blind")
-    if price_tag:
-        return int(price_tag.text.replace(',', ''))
-    return None
+async def fetch_and_update_redis(session, redis_client, code, sem):
+    async with sem:
+        url = f"https://polling.finance.naver.com/api/realtime?query=SERVICE_ITEM:{code}"
+        try:
+            async with session.get(url, timeout=10) as res:
+                if res.status == 200:
+                    data = await res.json(content_type=None)
+                    items = data.get('result', {}).get('areas', [{}])[0].get('datas', [])
+                    
+                    if items:
+                        price_val = items[0].get('nv')
+                        if price_val is not None:
+                            price = int(price_val)
 
-# 수집할 종목 코드 리스트
-codes = ['373220', '005930', '000660'] 
+                            # Redis 저장
+                            await redis_client.set(f"stock:{code}:price", price)
 
-print("🚀 실시간 시세 수집 시작...")
+        except Exception:
+            pass  # 네트워크 오류 무시
 
-try:
+async def run_collector_redis_only():
+    redis_client = redis.Redis(
+        host=REDIS_HOST,
+        port=REDIS_PORT,
+        decode_responses=True
+    )
+
+    keys = await redis_client.keys("stock:*:price")
+    codes = [key.split(":")[1] for key in keys]
+
+    if not codes:
+        print(f"⚠️ [{datetime.now()}] 수집할 종목 코드가 Redis에 없습니다.")
+        await redis_client.aclose()
+        return
+
+    print(f"🚀 [{datetime.now()}] 실시간 수집 시작 (총 {len(codes)}개, 세마포어: 100)")
+
+    sem = asyncio.Semaphore(100)
+    connector = aiohttp.TCPConnector(limit=200, ttl_dns_cache=300)
+    
+    async with aiohttp.ClientSession(connector=connector) as session:
+        tasks = [
+            fetch_and_update_redis(session, redis_client, code, sem)
+            for code in codes
+        ]
+        await asyncio.gather(*tasks)
+
+    await redis_client.aclose()
+    print(f"✅ [{datetime.now()}] 한 사이클 완료 (Redis 갱신 성공)")
+
+if __name__ == "__main__":
     while True:
-        for code in codes:
-            price = get_realtime_price(code)
-            if price:
-                # 1. 현재가 테이블 업데이트 (stock_prices)
-                cursor.execute("UPDATE stock_prices SET price=%s WHERE code=%s", (price, code))
-                # 2. 차트 히스토리 추가 (stock_history) -> 이게 있어야 실시간 차트가 그려짐!
-                cursor.execute("INSERT INTO stock_history (stock_code, price) VALUES (%s, %s)", (code, price))
-                db.commit()
-                print(f"[{time.strftime('%H:%M:%S')}] {code}: {price}원 업데이트 완료")
+        start_time = time.time()
         
-        time.sleep(60) # 1분마다 반복
-except KeyboardInterrupt:
-    db.close()
+        try:
+            asyncio.run(run_collector_redis_only())
+        except Exception as e:
+            print(f"🚨 시스템 에러 발생: {e}")
+        
+        elapsed = time.time() - start_time
+        print(f"⏱️ 이번 수집 소요 시간: {elapsed:.2f}초")
+        
+        time.sleep(0)

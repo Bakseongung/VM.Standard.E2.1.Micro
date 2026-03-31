@@ -1,0 +1,17 @@
+[Unit]
+Description=Stock Data Collector Service
+After=network.target mysql.service redis-server.service
+
+[Service]
+# 우분투 계정 이름
+User=[x]
+# 파일이 있는 디렉토리
+WorkingDirectory=[x]
+# 실행할 명령어 (절대 경로 사용)
+ExecStart=/usr/bin/python3 -u /home/ubuntu/collector.py
+# 에러 나서 죽으면 5초 뒤에 자동으로 다시 살려내기
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
